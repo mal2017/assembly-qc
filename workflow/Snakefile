@@ -1,0 +1,25 @@
+# Setup
+shell.executable("/bin/bash")
+
+singularity: "docker://continuumio/miniconda3"
+#configfile: "config/config.yaml"
+pepfile: "config/pep.yaml"
+
+rule all:
+    input:
+        expand("results/busco/{s}",s=[x.sample_name for x in pep.samples]),
+        expand("results/blobtools/work/{s}",s=[x.sample_name for x in pep.samples])
+
+rule all_blobtools:
+    input:
+        expand('results/blobtools/work/{s}',s=[x.sample_name for x in pep.samples])
+
+rule all_busco:
+    input:
+        expand("results/busco/{s}",s=[x.sample_name for x in pep.samples])
+
+
+
+
+include: "rules/busco.smk"
+include: "rules/blobtools.smk"

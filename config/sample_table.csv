@@ -1,0 +1,2 @@
+sample_name,assembly_file,busco_lineage,taxid,assembly_file_path,coverage_path
+drosophila_auraria,genome.nextpolish.fa,diptera_odb10,7227,amarel_assembly,amarel_coverage
