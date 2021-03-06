@@ -108,7 +108,8 @@ rule uniprot_db:
         "../envs/diamond.yaml"
     shell:
         """
-        cp {input} {output}
+        mkdir -p {output}
+        cp {input} {output}/
         cd {output}
         tar xf reference_proteomes.tar.gz
         touch reference_proteomes.fasta.gz
