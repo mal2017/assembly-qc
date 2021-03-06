@@ -158,7 +158,7 @@ rule diamond_blastx_tax:
         "../envs/diamond.yaml"
     resources:
         time=480,
-        mem=10000,
+        mem=48000,
         cpus=32
     threads:
         32
@@ -166,8 +166,9 @@ rule diamond_blastx_tax:
         """
         diamond blastx \
             --query {input.fa} \
-            --db {input.uniprot}/uniprot.db.with.taxids \
-            --outfmt '6 qseqid staxids bitscore qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore' \
+            --db {input.uniprot}/reference_proteomes.dmnd \
+            --outfmt 6 qseqid staxids bitscore \
+            -b 7 \
             --sensitive \
             --max-target-seqs 1 \
             --evalue 1e-25 \
