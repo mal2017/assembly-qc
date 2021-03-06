@@ -77,25 +77,38 @@ rule nt:
         done
         """
 
-rule uniprot:
+rule uniprot_dl:
     input:
         rules.nt.output,
         rules.taxdump.output
     output:
+        "results/blobtools/uniprot-fa/reference_proteomes.tar.gz"
+    conda:
+        "../envs/aria2.yaml"
+    shell:
+        """
+        aria2c -x4 -o {output} \
+            ftp://ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/$(curl \
+                -vs ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/ 2>&1 | \
+                awk '/tar.gz/ {{print $9}}')
+        """
+
+rule uniprot_db:
+    input:
+        rules.uniprot_dl.output
+    output:
         directory("results/blobtools/uniprot/")
     resources:
-        time=480,
-        mem=10000,
-        cpus=2
+        time= 480,
+        cpus=24,
+        mem=20000,
+    threads:
+        24
     conda:
         "../envs/diamond.yaml"
     shell:
         """
-        mkdir -p {output}
-        wget -q -O {output}/reference_proteomes.tar.gz \
-            ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/$(curl \
-                -vs ftp.ebi.ac.uk/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/ 2>&1 | \
-                awk '/tar.gz/ {{print $9}}')
+        cp {input} {output}
         cd {output}
         tar xf reference_proteomes.tar.gz
         touch reference_proteomes.fasta.gz
@@ -104,7 +117,7 @@ rule uniprot:
         echo "accession\taccession.version\ttaxid\tgi" > reference_proteomes.taxid_map
         zcat */*/*.idmapping.gz | grep "NCBI_TaxID" | awk '{{print $1 "\t" $1 "\t" $3 "\t" 0}}' >> reference_proteomes.taxid_map
 
-        diamond makedb -p 16 --in reference_proteomes.fasta.gz --taxonmap reference_proteomes.taxid_map --taxonnodes ../taxdump/nodes.dmp -d reference_proteomes.dmnd
+        diamond makedb -p {threads} --in reference_proteomes.fasta.gz --taxonmap reference_proteomes.taxid_map --taxonnodes ../taxdump/nodes.dmp -d reference_proteomes.dmnd
         """
 
 
@@ -117,11 +130,11 @@ rule blastn_tax:
     conda:
         "../envs/blast.yaml"
     resources:
-        time=240,
-        mem=32000,
-        cpus=24
+        time=480,
+        mem=10000,
+        cpus=32
     threads:
-        24
+        32
     shell:
         """
         blastn -db {input.db}/nt \
@@ -136,18 +149,18 @@ rule blastn_tax:
 
 rule diamond_blastx_tax:
     input:
-        uniprot = rules.uniprot.output,
+        uniprot = rules.uniprot_db.output,
         fa = lambda wc: pep.get_sample(wc.sample).assembly_file_path,
     output:
         "results/blobtools/blast/{sample}.diamond_blastx_tax.out"
     conda:
         "../envs/diamond.yaml"
     resources:
-        time=240,
-        mem=32000,
-        cpus=24
+        time=480,
+        mem=10000,
+        cpus=32
     threads:
-        24
+        32
     shell:
         """
         diamond blastx \
