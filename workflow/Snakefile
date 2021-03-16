@@ -10,7 +10,7 @@ localrules: uniprot_dl
 rule all:
     input:
         expand("results/busco/{s}",s=[x.sample_name for x in pep.samples]),
-        expand("results/blobtools/work/{s}",s=[x.sample_name for x in pep.samples])
+        expand("results/blobtools/work/{s}.blobDB.json",s=[x.sample_name for x in pep.samples])
 
 rule all_blobtools:
     input:

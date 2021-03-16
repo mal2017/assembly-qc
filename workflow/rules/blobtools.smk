@@ -47,6 +47,22 @@ rule minimap2_aln:
             samtools sort -O BAM -o {output}
         """
 
+rule bam_index:
+    input:
+        "results/aln/{sample}/{sample}.{sub}.srt.bam"
+    output:
+        "results/aln/{sample}/{sample}.{sub}.srt.bam.bai"
+    threads:
+        8
+    resources:
+        time=20,
+        mem=10000,
+        cpus=8
+    conda:
+        "../envs/minimap2.yaml"
+    shell:
+        "samtools index -@ {threads} {input}"
+
 rule taxdump:
     output:
         directory("results/blobtools/taxdump")
@@ -153,48 +169,53 @@ rule diamond_blastx_tax:
         uniprot = rules.uniprot_db.output,
         fa = lambda wc: pep.get_sample(wc.sample).assembly_file_path,
     output:
-        "results/blobtools/blast/{sample}.diamond_blastx_tax.out"
+        o = "results/blobtools/blast/{sample}.diamond_blastx_tax.out",
+	    t = temp(directory("results/blobtools/blast/tmp-diamond-{sample}"))
     conda:
         "../envs/diamond.yaml"
     resources:
-        time=480,
-        mem=48000,
-        cpus=32
+        time=8000,
+        mem=128000,
+        cpus=16
     threads:
-        32
+        16
     shell:
         """
+	mkdir -p {output.t} &&
         diamond blastx \
             --query {input.fa} \
             --db {input.uniprot}/reference_proteomes.dmnd \
+	    --tmpdir {output.t} \
             --outfmt 6 qseqid staxids bitscore \
-            -b 7 \
-            --sensitive \
+            -b 12 -c1 \
+            --verbose \
             --max-target-seqs 1 \
             --evalue 1e-25 \
             --threads {threads} \
-            > {output}
+            > {output.o}
         """
 
 rule blobtools_create:
     input:
-        diamond = rules.diamond_blastx_tax.output,
+        diamond = rules.diamond_blastx_tax.output.o,
         blastn = rules.blastn_tax.output,
         bams = lambda wc: expand("results/aln/{s}/{s}.{sub}.srt.bam",s=wc.sample, sub=pep.get_sample(wc.sample).subsample_name),
         taxdump = rules.taxdump.output,
         fa = lambda wc: pep.get_sample(wc.sample).assembly_file_path,
+        bais = lambda wc: expand("results/aln/{s}/{s}.{sub}.srt.bam.bai",s=wc.sample, sub=pep.get_sample(wc.sample).subsample_name),
     output:
-        directory("results/blobtools/work/{sample}")
+        "results/blobtools/work/{sample}.blobDB.json",
     conda:
          "../envs/blobtools.yaml"
     resources:
         time=240,
         mem=32000,
-        cpus=2
+        cpus=24
     threads:
-        2
+        24
     params:
-        cov = lambda wc: ["--bam results/aln/{s}/{s}.{sub}.srt.bam".format(s=wc.sample, sub=x) for x in pep.get_sample(wc.sample).subsample_name]
+        cov = lambda wc: ["--bam results/aln/{s}/{s}.{sub}.srt.bam".format(s=wc.sample, sub=x) for x in pep.get_sample(wc.sample).subsample_name],
+        o = "results/blobtools/work/{sample}"
     shell:
         """
         blobtools create -i {input.fa} \
@@ -203,7 +224,7 @@ rule blobtools_create:
             --nodes {input.taxdump}/nodes.dmp \
             --names {input.taxdump}/names.dmp \
             {params.cov} \
-            -o {output}
+            -o {params.o}
         """
 
 
